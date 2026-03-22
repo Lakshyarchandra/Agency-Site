@@ -1,8 +1,9 @@
-// lib/db.js
-import mysql from 'mysql2/promise';
+// server/lib/db.js
+const mysql = require('mysql2/promise');
 
 let pool;
-export function getDB() {
+
+function getDB() {
   if (!pool) {
     pool = mysql.createPool({
       host:     process.env.DB_HOST || 'localhost',
@@ -16,3 +17,5 @@ export function getDB() {
   }
   return pool;
 }
+
+module.exports = { getDB };

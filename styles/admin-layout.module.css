@@ -152,7 +152,7 @@
   flex-shrink: 0;
 }
 
-.navLabel { flex: 1; }
+.navLabel { flex: 0 1; }
 
 /* ── Footer ───────────────────────────────────────────── */
 .sidebarFooter {

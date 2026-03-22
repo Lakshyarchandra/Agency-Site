@@ -3,15 +3,17 @@ import Navbar from '../../components/layout/Navbar';
 import Footer from '../../components/layout/Footer';
 import SEOHead from '../../components/layout/SEOHead';
 import Link from 'next/link';
-import { getDB } from '../../lib/db';
+import { uploadUrl } from '../../lib/api';
 import s from '../../styles/blogs.module.css';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export async function getStaticPaths() {
   try {
-    const db = getDB();
-    const [rows] = await db.execute("SELECT slug FROM posts WHERE status='published'");
+    const res = await fetch(`${API_URL}/api/blogs/published`);
+    const { posts } = await res.json();
     return {
-      paths: rows.map(r => ({ params: { slug: r.slug } })),
+      paths: posts.map(p => ({ params: { slug: p.slug } })),
       fallback: 'blocking',
     };
   } catch {
@@ -21,28 +23,12 @@ export async function getStaticPaths() {
 
 export async function getStaticProps({ params }) {
   try {
-    const db = getDB();
-    const [rows] = await db.execute(
-      `SELECT p.*, c.name AS category, a.name AS author_name
-       FROM posts p
-       LEFT JOIN categories c ON c.id = p.category_id
-       LEFT JOIN admins a ON a.id = p.author_id
-       WHERE p.slug = ? AND p.status = 'published'`,
-      [params.slug]
-    );
-    if (!rows.length) return { notFound: true };
-
-    const [related] = await db.execute(
-      `SELECT id, title, slug, feature_image, published_at
-       FROM posts
-       WHERE status='published' AND slug != ? AND category_id = ?
-       LIMIT 3`,
-      [params.slug, rows[0].category_id || 0]
-    );
-
+    const res = await fetch(`${API_URL}/api/blogs/slug/${params.slug}`);
+    if (!res.ok) return { notFound: true };
+    const { post, related } = await res.json();
     return {
       props: {
-        post: JSON.parse(JSON.stringify(rows[0])),
+        post: JSON.parse(JSON.stringify(post)),
         related: JSON.parse(JSON.stringify(related)),
       },
       revalidate: 60,
@@ -64,7 +50,7 @@ export default function BlogPost({ post, related }) {
         description={post.meta_description || post.excerpt}
         keywords={post.meta_keywords}
         robots={post.robots}
-        ogImage={post.feature_image || '/og-default.jpg'}
+        ogImage={post.feature_image ? uploadUrl(post.feature_image) : '/og-default.jpg'}
         canonical={`/blogs/${post.slug}`}
       />
       <Navbar />
@@ -92,7 +78,7 @@ export default function BlogPost({ post, related }) {
         {post.feature_image && (
           <div className={s.featureImgWrap}>
             <div className="container">
-              <div className={s.featureImg} style={{ backgroundImage: `url(${post.feature_image})` }} />
+              <div className={s.featureImg} style={{ backgroundImage: `url(${uploadUrl(post.feature_image)})` }} />
             </div>
           </div>
         )}
@@ -121,7 +107,7 @@ export default function BlogPost({ post, related }) {
                       {related.map(r => (
                         <Link key={r.id} href={`/blogs/${r.slug}`} className={s.relatedItem}>
                           {r.feature_image && (
-                            <div className={s.relatedImg} style={{ backgroundImage: `url(${r.feature_image})` }} />
+                            <div className={s.relatedImg} style={{ backgroundImage: `url(${uploadUrl(r.feature_image)})` }} />
                           )}
                           <span className={s.relatedTitle}>{r.title}</span>
                         </Link>

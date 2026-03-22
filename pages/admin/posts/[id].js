@@ -1,181 +1,357 @@
-// pages/admin/posts/[id].js  — Edit existing post
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
+import Head from 'next/head';
 import AdminLayout from '../../../components/layout/AdminLayout';
-import { getAdminFromRequest } from '../../../lib/auth';
-import { getDB } from '../../../lib/db';
+import { isLoggedIn, getAdminInfo } from '../../../lib/auth';
+import { apiGet, apiUpload, uploadUrl } from '../../../lib/api';
 import toast from 'react-hot-toast';
 
 const ReactQuill = dynamic(() => import('react-quill'), {
-  ssr: false, loading: () => <div style={{ height: 200, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-3)' }}>Loading editor…</div>
+  ssr: false,
+  loading: () => <p style={{ color: '#888', padding: '1rem' }}>Loading editor...</p>,
 });
-
-export async function getServerSideProps({ req, params }) {
-  const admin = getAdminFromRequest(req);
-  if (!admin) return { redirect: { destination: '/admin', permanent: false } };
-
-  const db = getDB();
-  const [posts] = await db.execute('SELECT * FROM posts WHERE id = ?', [params.id]);
-  if (!posts.length) return { notFound: true };
-
-  const [categories] = await db.execute('SELECT * FROM categories ORDER BY name');
-  return {
-    props: {
-      admin: JSON.parse(JSON.stringify(admin)),
-      post: JSON.parse(JSON.stringify(posts[0])),
-      categories: JSON.parse(JSON.stringify(categories)),
-    },
-  };
-}
-
-const ROBOTS_OPTIONS = [
-  { value: 'index,follow',    label: '✅ Index, Follow (Recommended)' },
-  { value: 'noindex,nofollow',label: '❌ No Index, No Follow' },
-  { value: 'index,nofollow',  label: '🔗 Index, No Follow' },
-  { value: 'noindex,follow',  label: '🚫 No Index, Follow' },
-];
 
 const QUILL_MODULES = {
   toolbar: [
     [{ header: [1, 2, 3, false] }],
-    ['bold', 'italic', 'underline', 'strike', 'blockquote', 'code-block'],
+    ['bold', 'italic', 'underline', 'strike', 'blockquote'],
     [{ list: 'ordered' }, { list: 'bullet' }],
     ['link', 'image'],
-    [{ align: [] }],
     ['clean'],
   ],
 };
 
-export default function EditPost({ admin, post, categories }) {
-  const router = useRouter();
-  const fileRef = useRef();
+const ROBOTS_OPTIONS = [
+  { value: 'index,follow',     label: '✅ Index, Follow (Recommended)' },
+  { value: 'noindex,nofollow', label: '❌ No Index, No Follow' },
+  { value: 'index,nofollow',   label: '🔗 Index, No Follow' },
+  { value: 'noindex,follow',   label: '🚫 No Index, Follow' },
+];
 
-  const [form, setForm] = useState({
-    title:            post.title            || '',
-    slug:             post.slug             || '',
-    excerpt:          post.excerpt          || '',
-    content:          post.content          || '',
-    category_id:      post.category_id      || '',
-    status:           post.status           || 'draft',
-    meta_title:       post.meta_title       || '',
-    meta_description: post.meta_description || '',
-    meta_keywords:    post.meta_keywords    || '',
-    robots:           post.robots           || 'index,follow',
-  });
-  const [newImage, setNewImage]         = useState(null);
-  const [featurePreview, setFeaturePreview] = useState(post.feature_image || '');
-  const [saving, setSaving]             = useState(false);
-  const [activeTab, setActiveTab]       = useState('content');
+export default function EditPost() {
+  const router  = useRouter();
+  const { id }  = router.query;
+  const fileRef = useRef(null);
+
+  const [admin, setAdmin] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [title,          setTitle]          = useState('');
+  const [slug,           setSlug]           = useState('');
+  const [excerpt,        setExcerpt]        = useState('');
+  const [content,        setContent]        = useState('');
+  const [categoryId,     setCategoryId]     = useState('');
+  const [status,         setStatus]         = useState('draft');
+  const [metaTitle,      setMetaTitle]      = useState('');
+  const [metaDesc,       setMetaDesc]       = useState('');
+  const [metaKeywords,   setMetaKeywords]   = useState('');
+  const [robots,         setRobots]         = useState('index,follow');
+  const [featureImage,   setFeatureImage]   = useState(null);
+  const [featurePreview, setFeaturePreview] = useState('');
+  const [originalFeatureImage, setOriginalFeatureImage] = useState('');
+  const [saving,         setSaving]         = useState(false);
+  const [activeTab,      setActiveTab]      = useState('content');
+
+  useEffect(() => {
+    if (!id) return;
+    if (!isLoggedIn()) { router.replace('/admin'); return; }
+    setAdmin(getAdminInfo());
+
+    apiGet('/api/categories').then(data => { if (data) setCategories(data.categories); }).catch(() => {});
+    
+    apiGet(`/api/blogs/${id}`).then(data => {
+      if (data && data.post) {
+        const p = data.post;
+        setTitle(p.title || '');
+        setSlug(p.slug || '');
+        setExcerpt(p.excerpt || '');
+        setContent(p.content || '');
+        setCategoryId(p.category_id || '');
+        setStatus(p.status || 'draft');
+        setMetaTitle(p.meta_title || '');
+        setMetaDesc(p.meta_description || '');
+        setMetaKeywords(p.meta_keywords || '');
+        setRobots(p.robots || 'index,follow');
+        
+        if (p.feature_image) {
+          setFeaturePreview(uploadUrl(p.feature_image));
+          setOriginalFeatureImage(p.feature_image);
+        }
+      }
+    }).catch(() => {}).finally(() => setLoading(false));
+
+  }, [id]);
 
   const handleImage = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { toast.error('Max 5MB'); return; }
-    setNewImage(file);
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
+    setFeatureImage(file);
     setFeaturePreview(URL.createObjectURL(file));
   };
 
-  const charCount = (str, max) => {
-    const n = str?.length || 0;
-    const pct = Math.min(n / max, 1);
-    return { n, max, color: pct > 0.9 ? '#ff6666' : pct > 0.7 ? '#FFB347' : '#22cc88' };
+  const removeImage = () => {
+    setFeatureImage(null);
+    setFeaturePreview('');
+    setOriginalFeatureImage('');
   };
 
-  const save = async (statusOverride) => {
-    const finalStatus = statusOverride || form.status;
-    if (!form.title.trim())   { toast.error('Title is required'); return; }
-    if (!form.slug.trim())    { toast.error('Slug is required');  return; }
+  const handleSave = async (saveStatus) => {
+    if (!title.trim())                           { toast.error('Title is required');   return; }
+    if (!slug.trim())                            { toast.error('Slug is required');    return; }
+    if (!content.replace(/<[^>]+>/g, '').trim()) { toast.error('Content is required'); return; }
 
     setSaving(true);
     try {
       const fd = new FormData();
-      Object.entries({ ...form, status: finalStatus }).forEach(([k, v]) => fd.append(k, v || ''));
-      if (newImage) fd.append('feature_image', newImage);
-      if (!newImage && featurePreview && featurePreview === post.feature_image) {
-        fd.append('existing_feature_image', post.feature_image);
+      fd.append('title',            title);
+      fd.append('slug',             slug);
+      fd.append('excerpt',          excerpt);
+      fd.append('content',          content);
+      fd.append('category_id',      categoryId);
+      fd.append('status',           saveStatus);
+      fd.append('meta_title',       metaTitle || title);
+      fd.append('meta_description', metaDesc);
+      fd.append('meta_keywords',    metaKeywords);
+      fd.append('robots',           robots);
+      
+      if (featureImage) {
+        fd.append('feature_image', featureImage);
+      } else if (originalFeatureImage && featurePreview) {
+        fd.append('feature_image', originalFeatureImage);
       }
 
-      const res = await fetch(`/api/blogs/${post.id}`, { method: 'PUT', body: fd });
-      const data = await res.json();
-      if (!res.ok) { toast.error(data.error || 'Failed to save'); return; }
-      toast.success(finalStatus === 'published' ? '🎉 Post published!' : '📋 Draft saved!');
+      // Important: Use PUT method for updating the post
+      const data = await apiUpload(`/api/blogs/${id}`, fd, 'PUT');
+      if (!data) return;
+
+      toast.success(saveStatus === 'published' ? '🎉 Post updated & published!' : '📋 Draft updated!');
       router.push('/admin/posts');
-    } catch { toast.error('Network error.'); }
-    finally { setSaving(false); }
+    } catch (err) {
+      toast.error(err?.error || 'Something went wrong. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const metaTitle = charCount(form.meta_title, 60);
-  const metaDesc  = charCount(form.meta_description, 160);
+  const titleLen   = metaTitle.length;
+  const descLen    = metaDesc.length;
+  const titleColor = titleLen > 54 ? '#ff6666' : titleLen > 40 ? '#FFB347' : '#22cc88';
+  const descColor  = descLen  > 145 ? '#ff6666' : descLen > 120 ? '#FFB347' : '#22cc88';
+
+  const seoChecks = [
+    { label: 'Title set',       ok: !!title },
+    { label: 'Slug set',        ok: !!slug },
+    { label: 'Excerpt set',     ok: !!excerpt },
+    { label: 'Meta title',      ok: !!metaTitle },
+    { label: 'Meta description',ok: !!metaDesc },
+    { label: 'Feature image',   ok: !!featurePreview },
+    { label: 'Indexed',         ok: robots.startsWith('index') },
+  ];
+
+  if (loading) {
+    return (
+      <AdminLayout title="Edit Post" admin={admin || {}}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
+          <span className="spinner" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
-    <AdminLayout title={`Edit: ${post.title.slice(0, 40)}…`} admin={admin}>
-      <div className="editor-root">
-        {/* Left */}
-        <div className="editor-main">
+    <AdminLayout title="Edit Post" admin={admin || {}}>
+      <Head>
+        <link rel="stylesheet" href="https://unpkg.com/react-quill@2.0.0/dist/quill.snow.css" />
+      </Head>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 290px', gap: '1.5rem', alignItems: 'start' }}>
+
+        {/* ── LEFT COLUMN ───────────────────────────────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+          {/* Title input */}
           <input
-            className="title-input"
-            value={form.title} placeholder="Post title…"
-            onChange={e => setForm({ ...form, title: e.target.value })}
+            type="text"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="Post title..."
+            style={{
+              width: '100%', background: 'transparent', border: 'none',
+              borderBottom: '2px solid #1E1E30', color: '#EDE8DF',
+              fontFamily: 'Cormorant Garamond, serif', fontSize: '2rem', fontWeight: 700,
+              padding: '0.5rem 0', outline: 'none',
+            }}
+            onFocus={e => e.target.style.borderBottomColor = '#FF6B00'}
+            onBlur={e  => e.target.style.borderBottomColor = '#1E1E30'}
           />
-          <div className="slug-field">
-            <span className="slug-prefix">CodePromix.in/blogs/</span>
-            <input className="slug-input" value={form.slug}
-              onChange={e => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,'') })} />
+
+          {/* Slug row */}
+          <div style={{ display: 'flex', alignItems: 'center', background: '#111120', border: '1px solid rgba(255,107,0,0.14)', borderRadius: '10px', overflow: 'hidden' }}>
+            <span style={{ padding: '0.55rem 0.75rem', background: '#181828', borderRight: '1px solid rgba(255,107,0,0.14)', fontFamily: 'Space Mono, monospace', fontSize: '0.72rem', color: '#6B6357', whiteSpace: 'nowrap' }}>
+              yourdomain.com/blogs/
+            </span>
+            <input
+              type="text"
+              value={slug}
+              onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+              placeholder="post-slug"
+              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', padding: '0.55rem 0.75rem', color: '#FF6B00', fontFamily: 'Space Mono, monospace', fontSize: '0.82rem' }}
+            />
           </div>
 
-          <div className="editor-tabs">
-            <button className={`etab ${activeTab==='content'?'active':''}`} onClick={()=>setActiveTab('content')}>✍️ Content</button>
-            <button className={`etab ${activeTab==='seo'?'active':''}`} onClick={()=>setActiveTab('seo')}>🔍 SEO & Meta</button>
+          {/* Tabs */}
+          <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,107,0,0.14)', gap: '0.25rem' }}>
+            {['content', 'seo'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: '0.65rem 1.25rem', background: 'none', border: 'none',
+                  borderBottom: activeTab === tab ? '2px solid #FF6B00' : '2px solid transparent',
+                  marginBottom: '-1px', cursor: 'pointer',
+                  color: activeTab === tab ? '#FF6B00' : '#A09880',
+                  fontFamily: 'DM Sans, sans-serif', fontSize: '0.9rem', fontWeight: 600,
+                }}
+              >
+                {tab === 'content' ? '✍️ Content' : '🔍 SEO & Meta'}
+              </button>
+            ))}
           </div>
 
+          {/* ── CONTENT TAB ── */}
           {activeTab === 'content' && (
-            <div className="content-tab">
-              <div className="field">
-                <label>Excerpt</label>
-                <textarea rows={3} value={form.excerpt}
-                  onChange={e => setForm({...form,excerpt:e.target.value})}
-                  placeholder="Short description…" />
-              </div>
-              <div className="field">
-                <label>Post Content *</label>
-                <div className="quill-wrap">
-                  <ReactQuill value={form.content} onChange={v=>setForm(f=>({...f,content:v}))}
-                    modules={QUILL_MODULES} theme="snow" />
-                </div>
-              </div>
-            </div>
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+             {/* Excerpt */}
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+               <label style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#A09880' }}>
+                 Excerpt <span style={{ color: '#6B6357', textTransform: 'none', fontWeight: 400, letterSpacing: 0 }}>— short preview description</span>
+               </label>
+               <textarea
+                 rows={3}
+                 value={excerpt}
+                 onChange={e => setExcerpt(e.target.value)}
+                 placeholder="A compelling 1–2 sentence summary of the post..."
+                 style={{ background: '#111120', border: '1px solid rgba(255,107,0,0.14)', borderRadius: '10px', padding: '0.75rem 1rem', color: '#EDE8DF', fontFamily: 'DM Sans, sans-serif', fontSize: '0.92rem', resize: 'none', outline: 'none' }}
+                 onFocus={e => e.target.style.borderColor = '#FF6B00'}
+                 onBlur={e  => e.target.style.borderColor = 'rgba(255,107,0,0.14)'}
+               />
+             </div>
+
+             {/* Rich editor */}
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+               <label style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#A09880' }}>
+                 Post Content *
+               </label>
+               <div className="quill-wrap">
+                 <ReactQuill
+                   theme="snow"
+                   value={content}
+                   onChange={setContent}
+                   modules={QUILL_MODULES}
+                 />
+               </div>
+             </div>
+           </div>
           )}
 
+          {/* ── SEO TAB ── */}
           {activeTab === 'seo' && (
-            <div className="seo-tab">
-              <div className="seo-preview-box">
-                <div className="seo-preview-url">CodePromix.in › blogs › {form.slug}</div>
-                <div className="seo-preview-title">{form.meta_title || form.title}</div>
-                <div className="seo-preview-desc">{form.meta_description || form.excerpt || '—'}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingTop: '0.5rem' }}>
+
+              {/* Google preview */}
+              <div style={{ background: 'white', border: '1px solid #ddd', borderRadius: '10px', padding: '1rem 1.25rem' }}>
+                <div style={{ fontSize: '0.68rem', color: '#888', marginBottom: '4px' }}>Google Search Preview</div>
+                <div style={{ fontSize: '0.78rem', color: '#1a7a30', marginBottom: '2px' }}>yourdomain.com › blogs › {slug || 'post-slug'}</div>
+                <div style={{ fontSize: '1.05rem', color: '#1558d6', fontWeight: 500, marginBottom: '4px', lineHeight: 1.3 }}>{metaTitle || title || 'Post Title'}</div>
+                <div style={{ fontSize: '0.82rem', color: '#444', lineHeight: 1.5 }}>{metaDesc || excerpt || 'Post description will appear here...'}</div>
               </div>
-              <div className="field">
-                <label className="label-flex">Meta Title <span style={{color:metaTitle.color}}>{metaTitle.n}/60</span></label>
-                <input value={form.meta_title} onChange={e=>setForm({...form,meta_title:e.target.value})} maxLength={100} />
-                <div className="char-bar"><div className="char-fill" style={{width:`${(metaTitle.n/60)*100}%`,background:metaTitle.color}}/></div>
+
+              {/* Meta title */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#A09880' }}>Meta Title</label>
+                  <span style={{ fontSize: '0.75rem', color: titleColor }}>{titleLen}/60</span>
+                </div>
+                <input
+                  type="text"
+                  value={metaTitle}
+                  onChange={e => setMetaTitle(e.target.value)}
+                  placeholder="SEO title (60 chars ideal)"
+                  maxLength={100}
+                  style={{ background: '#111120', border: '1px solid rgba(255,107,0,0.14)', borderRadius: '10px', padding: '0.75rem 1rem', color: '#EDE8DF', fontFamily: 'DM Sans, sans-serif', fontSize: '0.92rem', outline: 'none' }}
+                  onFocus={e => e.target.style.borderColor = '#FF6B00'}
+                  onBlur={e  => e.target.style.borderColor = 'rgba(255,107,0,0.14)'}
+                />
+                <div style={{ height: '3px', background: '#1E1E30', borderRadius: '2px' }}>
+                  <div style={{ height: '100%', width: `${Math.min((titleLen/60)*100, 100)}%`, background: titleColor, borderRadius: '2px', transition: 'width 0.3s' }} />
+                </div>
               </div>
-              <div className="field">
-                <label className="label-flex">Meta Description <span style={{color:metaDesc.color}}>{metaDesc.n}/160</span></label>
-                <textarea rows={3} value={form.meta_description} onChange={e=>setForm({...form,meta_description:e.target.value})} maxLength={200} />
-                <div className="char-bar"><div className="char-fill" style={{width:`${(metaDesc.n/160)*100}%`,background:metaDesc.color}}/></div>
+
+              {/* Meta description */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#A09880' }}>Meta Description</label>
+                  <span style={{ fontSize: '0.75rem', color: descColor }}>{descLen}/160</span>
+                </div>
+                <textarea
+                  rows={3}
+                  value={metaDesc}
+                  onChange={e => setMetaDesc(e.target.value)}
+                  placeholder="Meta description (160 chars ideal)"
+                  maxLength={200}
+                  style={{ background: '#111120', border: '1px solid rgba(255,107,0,0.14)', borderRadius: '10px', padding: '0.75rem 1rem', color: '#EDE8DF', fontFamily: 'DM Sans, sans-serif', fontSize: '0.92rem', resize: 'none', outline: 'none' }}
+                  onFocus={e => e.target.style.borderColor = '#FF6B00'}
+                  onBlur={e  => e.target.style.borderColor = 'rgba(255,107,0,0.14)'}
+                />
+                <div style={{ height: '3px', background: '#1E1E30', borderRadius: '2px' }}>
+                  <div style={{ height: '100%', width: `${Math.min((descLen/160)*100, 100)}%`, background: descColor, borderRadius: '2px', transition: 'width 0.3s' }} />
+                </div>
               </div>
-              <div className="field">
-                <label>Meta Keywords</label>
-                <input value={form.meta_keywords} onChange={e=>setForm({...form,meta_keywords:e.target.value})} />
+
+              {/* Meta keywords */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#A09880' }}>
+                  Meta Keywords <span style={{ color: '#6B6357', textTransform: 'none', fontWeight: 400, letterSpacing: 0 }}>— comma separated</span>
+                </label>
+                <input
+                  type="text"
+                  value={metaKeywords}
+                  onChange={e => setMetaKeywords(e.target.value)}
+                  placeholder="web design, SEO, digital marketing"
+                  style={{ background: '#111120', border: '1px solid rgba(255,107,0,0.14)', borderRadius: '10px', padding: '0.75rem 1rem', color: '#EDE8DF', fontFamily: 'DM Sans, sans-serif', fontSize: '0.92rem', outline: 'none' }}
+                  onFocus={e => e.target.style.borderColor = '#FF6B00'}
+                  onBlur={e  => e.target.style.borderColor = 'rgba(255,107,0,0.14)'}
+                />
               </div>
-              <div className="field">
-                <label>Robots / Indexing</label>
-                <div className="robots-options">
+
+              {/* Robots */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#A09880' }}>Robots / Indexing</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {ROBOTS_OPTIONS.map(opt => (
-                    <label key={opt.value} className={`robot-opt ${form.robots===opt.value?'selected':''}`}>
-                      <input type="radio" name="robots" value={opt.value}
-                        checked={form.robots===opt.value}
-                        onChange={()=>setForm({...form,robots:opt.value})} />
+                    <label
+                      key={opt.value}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.75rem',
+                        padding: '0.7rem 1rem', cursor: 'pointer',
+                        background: robots === opt.value ? 'rgba(255,107,0,0.06)' : '#111120',
+                        border: `1px solid ${robots === opt.value ? '#FF6B00' : 'rgba(255,107,0,0.14)'}`,
+                        borderRadius: '10px', color: robots === opt.value ? '#EDE8DF' : '#A09880',
+                        fontSize: '0.88rem', transition: 'all 0.2s',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="robots"
+                        value={opt.value}
+                        checked={robots === opt.value}
+                        onChange={() => setRobots(opt.value)}
+                        style={{ accentColor: '#FF6B00' }}
+                      />
                       {opt.label}
                     </label>
                   ))}
@@ -185,151 +361,152 @@ export default function EditPost({ admin, post, categories }) {
           )}
         </div>
 
-        {/* Sidebar */}
-        <aside className="editor-sidebar">
-          <div className="sidebar-card">
-            <h3 className="sc-title">Update Post</h3>
-            <div className="sc-field">
-              <label>Status</label>
-              <select value={form.status} onChange={e=>setForm({...form,status:e.target.value})}>
+        {/* ── RIGHT SIDEBAR ─────────────────────────────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', position: 'sticky', top: '80px' }}>
+
+          {/* Publish card */}
+          <div style={{ background: '#111120', border: '1px solid rgba(255,107,0,0.14)', borderRadius: '18px', padding: '1.25rem' }}>
+            <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '1.05rem', fontWeight: 700, color: '#EDE8DF', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,107,0,0.14)' }}>
+              Update Post
+            </h3>
+
+            {/* Status */}
+            <div style={{ marginBottom: '0.85rem' }}>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6B6357', marginBottom: '0.3rem' }}>Status</label>
+              <select
+                value={status}
+                onChange={e => setStatus(e.target.value)}
+                style={{ width: '100%', background: '#181828', border: '1px solid rgba(255,107,0,0.14)', borderRadius: '10px', padding: '0.55rem 0.8rem', color: '#EDE8DF', fontFamily: 'DM Sans, sans-serif', fontSize: '0.88rem', outline: 'none' }}
+              >
                 <option value="draft">📋 Draft</option>
                 <option value="published">🌐 Published</option>
               </select>
             </div>
-            <div className="sc-field">
-              <label>Category</label>
-              <select value={form.category_id} onChange={e=>setForm({...form,category_id:e.target.value})}>
-                <option value="">— Select —</option>
-                {categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+
+            {/* Category */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6B6357', marginBottom: '0.3rem' }}>Category</label>
+              <select
+                value={categoryId}
+                onChange={e => setCategoryId(e.target.value)}
+                style={{ width: '100%', background: '#181828', border: '1px solid rgba(255,107,0,0.14)', borderRadius: '10px', padding: '0.55rem 0.8rem', color: '#EDE8DF', fontFamily: 'DM Sans, sans-serif', fontSize: '0.88rem', outline: 'none' }}
+              >
+                <option value="">— Select Category —</option>
+                {categories.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+            </select>
             </div>
-            <div className="publish-actions">
-              <button className="btn-draft" onClick={()=>save('draft')} disabled={saving}>
-                {saving&&<span className="mini-spin"/>} Save Draft
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={() => handleSave('draft')}
+                disabled={saving}
+                style={{ flex: 1, padding: '0.65rem', background: '#181828', border: '1px solid rgba(255,107,0,0.28)', borderRadius: '10px', color: '#A09880', fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+              >
+                Update Draft
               </button>
-              <button className="btn-publish" onClick={()=>save('published')} disabled={saving}>
-                {saving&&<span className="mini-spin"/>} 🚀 Update
+              <button
+                onClick={() => handleSave('published')}
+                disabled={saving}
+                style={{ flex: 1, padding: '0.65rem', background: 'linear-gradient(135deg, #FF6B00, #C94D00)', border: 'none', borderRadius: '10px', color: 'white', fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1, boxShadow: '0 4px 16px rgba(255,107,0,0.35)' }}
+              >
+                {saving ? 'Updating...' : '🚀 Update'}
               </button>
             </div>
           </div>
 
-          <div className="sidebar-card">
-            <h3 className="sc-title">Feature Image</h3>
+          {/* Feature Image card */}
+          <div style={{ background: '#111120', border: '1px solid rgba(255,107,0,0.14)', borderRadius: '18px', padding: '1.25rem' }}>
+            <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '1.05rem', fontWeight: 700, color: '#EDE8DF', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,107,0,0.14)' }}>
+              Feature Image
+            </h3>
+
             {featurePreview ? (
-              <div className="img-preview">
-                <img src={featurePreview} alt="Preview" />
-                <button className="remove-img" onClick={()=>{setNewImage(null);setFeaturePreview('');}}>✕ Remove</button>
+              <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden' }}>
+                <img src={featurePreview} alt="Preview" style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }} />
+                <button
+                  onClick={removeImage}
+                  style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.75)', border: 'none', color: 'white', fontSize: '0.75rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px', cursor: 'pointer' }}
+                >
+                  ✕ Remove
+                </button>
               </div>
             ) : (
-              <div className="img-dropzone" onClick={()=>fileRef.current?.click()}>
+              <div
+                onClick={() => fileRef.current?.click()}
+                style={{ border: '2px dashed rgba(255,107,0,0.28)', borderRadius: '10px', padding: '2rem 1rem', textAlign: 'center', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: '#6B6357' }}
+                onMouseOver={e => { e.currentTarget.style.borderColor = '#FF6B00'; e.currentTarget.style.color = '#FF6B00'; }}
+                onMouseOut={e  => { e.currentTarget.style.borderColor = 'rgba(255,107,0,0.28)'; e.currentTarget.style.color = '#6B6357'; }}
+              >
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+                  <rect x="3" y="3" width="18" height="18" rx="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
                   <polyline points="21 15 16 10 5 21"/>
                 </svg>
-                <span>Click to upload</span>
+                <span style={{ fontSize: '0.88rem', fontWeight: 500 }}>Click to upload</span>
+                <span style={{ fontSize: '0.72rem' }}>PNG, JPG, WebP · Max 5MB</span>
               </div>
             )}
-            <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} style={{display:'none'}} />
-            {featurePreview && <button className="change-img" onClick={()=>fileRef.current?.click()}>Change Image</button>}
+
+            <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} style={{ display: 'none' }} />
+
+            {featurePreview && (
+              <button
+                onClick={() => fileRef.current?.click()}
+                style={{ display: 'block', width: '100%', marginTop: '0.75rem', padding: '0.5rem', background: 'none', border: '1px solid rgba(255,107,0,0.14)', borderRadius: '10px', color: '#A09880', fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', cursor: 'pointer' }}
+              >
+                Change Image
+              </button>
+            )}
           </div>
 
-          <div className="sidebar-card seo-status-card">
-            <h3 className="sc-title">SEO Status</h3>
-            {[
-              { label:'Title',       ok:!!form.title },
-              { label:'Slug',        ok:!!form.slug },
-              { label:'Excerpt',     ok:!!form.excerpt },
-              { label:'Meta Title',  ok:!!form.meta_title },
-              { label:'Meta Desc',   ok:!!form.meta_description },
-              { label:'Feature Img', ok:!!featurePreview },
-              { label:'Indexed',     ok:form.robots.startsWith('index') },
-            ].map(({label,ok})=>(
-              <div key={label} className="seo-check">
-                <span className={`seo-dot ${ok?'good':'bad'}`}/>
-                <span className={ok?'seo-good':'seo-bad'}>{label}</span>
+          {/* SEO status card */}
+          <div style={{ background: '#111120', border: '1px solid rgba(255,107,0,0.14)', borderRadius: '18px', padding: '1.25rem' }}>
+            <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '1.05rem', fontWeight: 700, color: '#EDE8DF', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,107,0,0.14)' }}>
+              SEO Status
+            </h3>
+            {seoChecks.map(({ label, ok }) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,107,0,0.05)', fontSize: '0.84rem' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, background: ok ? '#22cc88' : 'rgba(255,107,0,0.28)' }} />
+                <span style={{ color: ok ? '#EDE8DF' : '#6B6357' }}>{label}</span>
               </div>
             ))}
           </div>
-        </aside>
+
+        </div>
       </div>
 
-      {/* Reuse same styles as new.js — injected globally via _app */}
+      {/* Quill dark theme */}
       <style jsx global>{`
-        .quill-wrap .ql-toolbar { background:var(--surface-2)!important; border:1px solid var(--border)!important; border-bottom:none!important; border-radius:var(--radius) var(--radius) 0 0; }
-        .quill-wrap .ql-container { background:var(--surface-2)!important; border:1px solid var(--border)!important; border-radius:0 0 var(--radius) var(--radius); min-height:320px; font-family:'DM Sans',sans-serif!important; font-size:1rem!important; color:var(--text-1)!important; }
-        .quill-wrap .ql-editor { min-height:320px; line-height:1.8; }
-        .quill-wrap .ql-editor.ql-blank::before { color:var(--text-3)!important; font-style:normal!important; }
-        .quill-wrap .ql-stroke { stroke:var(--text-2)!important; }
-        .quill-wrap .ql-fill   { fill:var(--text-2)!important; }
-        .quill-wrap .ql-picker-label { color:var(--text-2)!important; }
-        .quill-wrap .ql-picker-options { background:var(--surface-2)!important; border:1px solid var(--border)!important; }
-        .quill-wrap .ql-toolbar button:hover .ql-stroke { stroke:var(--saffron)!important; }
-        .quill-wrap .ql-active .ql-stroke { stroke:var(--saffron)!important; }
-        .quill-wrap .ql-active .ql-fill { fill:var(--saffron)!important; }
-      `}</style>
-      <style jsx>{`
-        .editor-root { display:grid; grid-template-columns:1fr 300px; gap:1.75rem; align-items:start; }
-        .editor-main { display:flex; flex-direction:column; gap:1.25rem; }
-        .title-input { width:100%; background:transparent; border:none; border-bottom:2px solid var(--border); color:var(--text-1); font-family:'Cormorant Garamond',serif; font-size:2rem; font-weight:700; padding:0.5rem 0; }
-        .title-input:focus { outline:none; border-bottom-color:var(--saffron); }
-        .title-input::placeholder { color:var(--text-3); }
-        .slug-field { display:flex; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
-        .slug-prefix { padding:0.55rem 0.75rem; background:var(--surface-2); border-right:1px solid var(--border); font-family:'Space Mono',monospace; font-size:0.75rem; color:var(--text-3); }
-        .slug-input { flex:1; background:transparent; border:none; padding:0.55rem 0.75rem; color:var(--saffron); font-family:'Space Mono',monospace; font-size:0.82rem; }
-        .slug-input:focus { outline:none; }
-        .editor-tabs { display:flex; gap:0.25rem; border-bottom:1px solid var(--border); }
-        .etab { padding:0.65rem 1.25rem; background:none; border:none; border-bottom:2px solid transparent; margin-bottom:-1px; font-family:'DM Sans',sans-serif; font-size:0.9rem; font-weight:600; color:var(--text-2); cursor:pointer; transition:color var(--transition), border-color var(--transition); }
-        .etab:hover { color:var(--text-1); }
-        .etab.active { color:var(--saffron); border-bottom-color:var(--saffron); }
-        .content-tab, .seo-tab { display:flex; flex-direction:column; gap:1.25rem; padding-top:1rem; }
-        .field { display:flex; flex-direction:column; gap:0.4rem; }
-        .field label,.label-flex { font-size:0.78rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-2); display:flex; align-items:center; justify-content:space-between; }
-        .field input,.field textarea,.field select { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:0.75rem 1rem; color:var(--text-1); font-family:'DM Sans',sans-serif; font-size:0.92rem; transition:border-color var(--transition); resize:none; }
-        .field input:focus,.field textarea:focus,.field select:focus { outline:none; border-color:var(--saffron); }
-        .field select option { background:var(--surface-2); }
-        .char-bar { height:3px; background:var(--border); border-radius:2px; margin-top:4px; }
-        .char-fill { height:100%; border-radius:2px; transition:width 0.3s, background 0.3s; }
-        .robots-options { display:flex; flex-direction:column; gap:0.5rem; }
-        .robot-opt { display:flex; align-items:center; gap:0.6rem; padding:0.7rem 1rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; font-size:0.88rem; color:var(--text-2); transition:border-color var(--transition), color var(--transition); }
-        .robot-opt.selected { border-color:var(--saffron); color:var(--text-1); background:rgba(255,107,0,0.05); }
-        .robot-opt input { accent-color:var(--saffron); }
-        .seo-preview-box { background:white; border:1px solid #ddd; border-radius:var(--radius); padding:1rem 1.25rem; }
-        .seo-preview-url { font-size:0.78rem; color:#1a7a30; margin-bottom:2px; }
-        .seo-preview-title { font-size:1.05rem; color:#1558d6; font-weight:500; margin-bottom:4px; }
-        .seo-preview-desc { font-size:0.82rem; color:#444; line-height:1.5; }
-        .editor-sidebar { display:flex; flex-direction:column; gap:1.25rem; position:sticky; top:80px; }
-        .sidebar-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:1.25rem; }
-        .sc-title { font-family:'Cormorant Garamond',serif; font-size:1.05rem; font-weight:700; color:var(--text-1); margin-bottom:1rem; padding-bottom:0.75rem; border-bottom:1px solid var(--border); }
-        .sc-field { display:flex; flex-direction:column; gap:0.3rem; margin-bottom:0.85rem; }
-        .sc-field label { font-size:0.72rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-3); }
-        .sc-field select { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:0.55rem 0.8rem; color:var(--text-1); font-family:'DM Sans',sans-serif; font-size:0.88rem; }
-        .sc-field select:focus { outline:none; border-color:var(--saffron); }
-        .sc-field select option { background:var(--surface-2); }
-        .publish-actions { display:flex; gap:0.5rem; }
-        .btn-draft,.btn-publish { flex:1; padding:0.65rem; border-radius:var(--radius); font-family:'DM Sans',sans-serif; font-size:0.85rem; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:0.4rem; transition:all var(--transition); }
-        .btn-draft { background:var(--surface-2); border:1px solid var(--border); color:var(--text-2); }
-        .btn-draft:hover { border-color:var(--border-2); color:var(--text-1); }
-        .btn-publish { background:linear-gradient(135deg,var(--saffron),var(--saffron-dk)); border:none; color:white; box-shadow:0 4px 16px rgba(255,107,0,0.3); }
-        .btn-publish:hover { box-shadow:0 6px 24px rgba(255,107,0,0.5); }
-        .btn-draft:disabled,.btn-publish:disabled { opacity:0.6; cursor:not-allowed; }
-        .mini-spin { width:14px; height:14px; border:2px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.7s linear infinite; display:inline-block; }
-        @keyframes spin { to { transform:rotate(360deg); } }
-        .img-preview { position:relative; border-radius:var(--radius); overflow:hidden; }
-        .img-preview img { width:100%; height:160px; object-fit:cover; display:block; }
-        .remove-img { position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.7); border:none; color:white; font-size:0.75rem; font-weight:600; padding:4px 10px; border-radius:6px; cursor:pointer; }
-        .img-dropzone { border:2px dashed var(--border); border-radius:var(--radius); padding:2rem 1rem; text-align:center; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:0.5rem; color:var(--text-3); transition:border-color var(--transition), color var(--transition); }
-        .img-dropzone:hover { border-color:var(--saffron); color:var(--saffron); }
-        .img-dropzone span { font-size:0.88rem; font-weight:500; }
-        .change-img { display:block; width:100%; margin-top:0.75rem; padding:0.5rem; background:none; border:1px solid var(--border); border-radius:var(--radius); color:var(--text-2); font-family:'DM Sans',sans-serif; font-size:0.82rem; cursor:pointer; transition:border-color var(--transition), color var(--transition); }
-        .change-img:hover { border-color:var(--border-2); color:var(--text-1); }
-        .seo-check { display:flex; align-items:center; gap:0.6rem; padding:0.4rem 0; border-bottom:1px solid rgba(255,107,0,0.06); font-size:0.84rem; }
-        .seo-check:last-child { border-bottom:none; }
-        .seo-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-        .seo-dot.good { background:#22cc88; }
-        .seo-dot.bad  { background:var(--border-2); }
-        .seo-good { color:var(--text-1); }
-        .seo-bad  { color:var(--text-3); }
-        @media (max-width:900px) { .editor-root { grid-template-columns:1fr; } .editor-sidebar { position:static; } }
+        .quill-wrap .ql-toolbar {
+          background: #181828 !important;
+          border: 1px solid rgba(255,107,0,0.14) !important;
+          border-bottom: none !important;
+          border-radius: 10px 10px 0 0;
+        }
+        .quill-wrap .ql-container {
+          background: #181828 !important;
+          border: 1px solid rgba(255,107,0,0.14) !important;
+          border-radius: 0 0 10px 10px;
+          min-height: 380px;
+          font-family: 'DM Sans', sans-serif !important;
+          font-size: 1rem !important;
+          color: #EDE8DF !important;
+        }
+        .quill-wrap .ql-editor { min-height: 380px; line-height: 1.8; color: #EDE8DF; }
+        .quill-wrap .ql-editor.ql-blank::before { color: #6B6357 !important; font-style: normal !important; }
+        .quill-wrap .ql-stroke { stroke: #A09880 !important; }
+        .quill-wrap .ql-fill   { fill:   #A09880 !important; }
+        .quill-wrap .ql-picker-label { color: #A09880 !important; }
+        .quill-wrap .ql-picker-options {
+          background: #181828 !important;
+          border: 1px solid rgba(255,107,0,0.28) !important;
+        }
+        .quill-wrap .ql-toolbar button:hover .ql-stroke { stroke: #FF6B00 !important; }
+        .quill-wrap .ql-active .ql-stroke { stroke: #FF6B00 !important; }
+        .quill-wrap .ql-active .ql-fill   { fill:   #FF6B00 !important; }
       `}</style>
     </AdminLayout>
   );

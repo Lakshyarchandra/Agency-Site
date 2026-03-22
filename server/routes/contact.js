@@ -1,9 +1,11 @@
-// pages/api/contact.js
-import { getDB } from '../../lib/db';
+// server/routes/contact.js
+const express = require('express');
+const { getDB } = require('../lib/db');
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+const router = express.Router();
 
+// POST /api/contact — public contact form submission
+router.post('/', async (req, res) => {
   const { name, email, phone, service, message } = req.body;
 
   if (!name?.trim() || !email?.trim() || !message?.trim())
@@ -23,4 +25,6 @@ export default async function handler(req, res) {
     console.error('[contact]', err);
     return res.status(500).json({ error: 'Server error. Please try again.' });
   }
-}
+});
+
+module.exports = router;

@@ -1,30 +1,33 @@
-// pages/admin/categories.js
-import { useState } from 'react';
+// pages/admin/categories.js — Client-side data fetching
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '../../components/layout/AdminLayout';
-import { getAdminFromRequest } from '../../lib/auth';
-import { getDB } from '../../lib/db';
+import { isLoggedIn, getAdminInfo } from '../../lib/auth';
+import { apiGet, apiPost, apiDelete } from '../../lib/api';
 import toast from 'react-hot-toast';
 import s from '../../styles/admin-categories.module.css';
 
-export async function getServerSideProps({ req }) {
-  const admin = getAdminFromRequest(req);
-  if (!admin) return { redirect: { destination: '/admin', permanent: false } };
-  const db = getDB();
-  const [categories] = await db.execute(
-    `SELECT c.*, COUNT(p.id) AS post_count
-     FROM categories c
-     LEFT JOIN posts p ON p.category_id = c.id
-     GROUP BY c.id ORDER BY c.name`
-  );
-  return { props: { admin: JSON.parse(JSON.stringify(admin)), categories: JSON.parse(JSON.stringify(categories)) } };
-}
-
-export default function Categories({ admin, categories: initialCats }) {
+export default function Categories() {
   const router = useRouter();
-  const [cats, setCats]     = useState(initialCats);
-  const [name, setName]     = useState('');
+  const [admin, setAdmin] = useState(null);
+  const [cats, setCats]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [name, setName]   = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isLoggedIn()) { router.replace('/admin'); return; }
+    setAdmin(getAdminInfo());
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      const data = await apiGet('/api/categories');
+      if (data) setCats(data.categories);
+    } catch {}
+    finally { setLoading(false); }
+  };
 
   const slug = name.toLowerCase().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-');
 
@@ -33,29 +36,35 @@ export default function Categories({ admin, categories: initialCats }) {
     if (!name.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch('/api/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), slug }),
-      });
-      const data = await res.json();
-      if (!res.ok) { toast.error(data.error); return; }
+      await apiPost('/api/categories', { name: name.trim(), slug });
       toast.success('Category added!');
       setName('');
-      router.replace(router.asPath);
-    } catch { toast.error('Error adding category'); }
+      loadCategories();
+    } catch (err) { toast.error(err?.error || 'Error adding category'); }
     finally { setSaving(false); }
   };
 
   const del = async (id, catName) => {
     if (!confirm(`Delete "${catName}"?`)) return;
-    const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' });
-    if (res.ok) { toast.success('Deleted'); router.replace(router.asPath); }
-    else toast.error('Failed to delete');
+    try {
+      await apiDelete(`/api/categories/${id}`);
+      toast.success('Deleted');
+      setCats(prev => prev.filter(c => c.id !== id));
+    } catch { toast.error('Failed to delete'); }
   };
 
+  if (loading) {
+    return (
+      <AdminLayout title="Categories" admin={admin || {}}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
+          <span className="spinner" />
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
-    <AdminLayout title="Categories" admin={admin}>
+    <AdminLayout title="Categories" admin={admin || {}}>
       <div className={s.grid}>
         {/* Add form */}
         <div className={s.formCard}>
@@ -90,7 +99,7 @@ export default function Categories({ admin, categories: initialCats }) {
                   <tr key={c.id}>
                     <td className={s.categoryName}>{c.name}</td>
                     <td className={s.categorySlug}>/{c.slug}</td>
-                    <td><span className={s.postCount}>{c.post_count}</span></td>
+                    <td><span className={s.postCount}>{c.post_count || 0}</span></td>
                     <td>
                       <button className={s.deleteButton} onClick={()=>del(c.id,c.name)}
                         title="Delete">

@@ -5,6 +5,7 @@ import Footer from '../components/layout/Footer';
 import SEOHead from '../components/layout/SEOHead';
 import toast from 'react-hot-toast';
 import { useScrollReveal } from '../lib/useGSAP';
+import { API_URL } from '../lib/api';
 import s from '../styles/contact.module.css';
 
 const SERVICES = [
@@ -23,7 +24,7 @@ export default function Contact() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch('/api/contact', {
+      const res = await fetch(`${API_URL}/api/contact`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

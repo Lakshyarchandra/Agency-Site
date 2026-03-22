@@ -1,47 +1,67 @@
-// pages/admin/messages.js
-import { useState } from 'react';
+// pages/admin/messages.js — Client-side data fetching
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import AdminLayout from '../../components/layout/AdminLayout';
-import { getAdminFromRequest } from '../../lib/auth';
-import { getDB } from '../../lib/db';
+import { isLoggedIn, getAdminInfo } from '../../lib/auth';
+import { apiGet, apiPatch, apiDelete } from '../../lib/api';
 import toast from 'react-hot-toast';
 import s from '../../styles/admin-messages.module.css';
 
-export async function getServerSideProps({ req }) {
-  const admin = getAdminFromRequest(req);
-  if (!admin) return { redirect: { destination: '/admin', permanent: false } };
-
-  const db = getDB();
-  const [messages] = await db.execute('SELECT * FROM contacts ORDER BY created_at DESC');
-
-  return { props: { admin: JSON.parse(JSON.stringify(admin)), messages: JSON.parse(JSON.stringify(messages)) } };
-}
-
-export default function Messages({ admin, messages: initialMessages }) {
-  const [messages, setMessages] = useState(initialMessages);
+export default function Messages() {
+  const router = useRouter();
+  const [admin, setAdmin] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    if (!isLoggedIn()) { router.replace('/admin'); return; }
+    setAdmin(getAdminInfo());
+    loadMessages();
+  }, []);
+
+  const loadMessages = async () => {
+    try {
+      const data = await apiGet('/api/messages');
+      if (data) setMessages(data.messages);
+    } catch {}
+    finally { setLoading(false); }
+  };
 
   const open = async (msg) => {
     setSelected(msg);
     if (!msg.is_read) {
-      await fetch(`/api/contact/${msg.id}/read`, { method: 'PATCH' });
-      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, is_read: 1 } : m));
+      try {
+        await apiPatch(`/api/messages/${msg.id}`);
+        setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, is_read: 1 } : m));
+      } catch {}
     }
   };
 
   const deleteMsg = async (id) => {
     if (!confirm('Delete this message?')) return;
-    const res = await fetch(`/api/contact/${id}`, { method: 'DELETE' });
-    if (res.ok) {
+    try {
+      await apiDelete(`/api/messages/${id}`);
       setMessages(prev => prev.filter(m => m.id !== id));
       if (selected?.id === id) setSelected(null);
       toast.success('Message deleted');
-    }
+    } catch { toast.error('Failed to delete'); }
   };
+
+  if (loading) {
+    return (
+      <AdminLayout title="Messages" admin={admin || {}}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
+          <span className="spinner" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   const unreadCount = messages.filter(m => !m.is_read).length;
 
   return (
-    <AdminLayout title="Messages" admin={admin}>
+    <AdminLayout title="Messages" admin={admin || {}}>
       <div className={s.inboxRoot}>
         {/* List pane */}
         <div className={s.listPane}>

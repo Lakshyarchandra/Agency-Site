@@ -3,27 +3,14 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import AdminLayout from '../../../components/layout/AdminLayout';
-import { getAdminFromRequest } from '../../../lib/auth';
-import { getDB } from '../../../lib/db';
+import { isLoggedIn, getAdminInfo } from '../../../lib/auth';
+import { apiGet, apiUpload, uploadUrl } from '../../../lib/api';
 import toast from 'react-hot-toast';
 
 const ReactQuill = dynamic(() => import('react-quill'), {
   ssr: false,
   loading: () => <p style={{ color: '#888', padding: '1rem' }}>Loading editor...</p>,
 });
-
-export async function getServerSideProps({ req }) {
-  const admin = getAdminFromRequest(req);
-  if (!admin) return { redirect: { destination: '/admin', permanent: false } };
-  const db = getDB();
-  const [categories] = await db.execute('SELECT * FROM categories ORDER BY name');
-  return {
-    props: {
-      admin: JSON.parse(JSON.stringify(admin)),
-      categories: JSON.parse(JSON.stringify(categories)),
-    },
-  };
-}
 
 const QUILL_MODULES = {
   toolbar: [
@@ -42,9 +29,13 @@ const ROBOTS_OPTIONS = [
   { value: 'noindex,follow',   label: '🚫 No Index, Follow' },
 ];
 
-export default function NewPost({ admin, categories }) {
+export default function NewPost() {
   const router  = useRouter();
   const fileRef = useRef(null);
+
+  const [admin, setAdmin] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [title,          setTitle]          = useState('');
   const [slug,           setSlug]           = useState('');
@@ -60,6 +51,15 @@ export default function NewPost({ admin, categories }) {
   const [featurePreview, setFeaturePreview] = useState('');
   const [saving,         setSaving]         = useState(false);
   const [activeTab,      setActiveTab]      = useState('content');
+
+  useEffect(() => {
+    if (!isLoggedIn()) { router.replace('/admin'); return; }
+    setAdmin(getAdminInfo());
+    apiGet('/api/categories')
+      .then(data => { if (data) setCategories(data.categories); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   // Auto slug from title
   useEffect(() => {
@@ -107,16 +107,13 @@ export default function NewPost({ admin, categories }) {
       fd.append('robots',           robots);
       if (featureImage) fd.append('feature_image', featureImage);
 
-      const res  = await fetch('/api/blogs/create', { method: 'POST', body: fd });
-      const data = await res.json();
-
-      if (!res.ok) { toast.error(data.error || 'Failed to save'); return; }
+      const data = await apiUpload('/api/blogs', fd);
+      if (!data) return;
 
       toast.success(saveStatus === 'published' ? '🎉 Post published!' : '📋 Draft saved!');
       router.push('/admin/posts');
     } catch (err) {
-      console.error(err);
-      toast.error('Something went wrong. Please try again.');
+      toast.error(err?.error || 'Something went wrong. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -137,8 +134,18 @@ export default function NewPost({ admin, categories }) {
     { label: 'Indexed',         ok: robots.startsWith('index') },
   ];
 
+  if (loading) {
+    return (
+      <AdminLayout title="New Post" admin={admin || {}}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
+          <span className="spinner" />
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
-    <AdminLayout title="New Post" admin={admin}>
+    <AdminLayout title="New Post" admin={admin || {}}>
       <Head>
         <link rel="stylesheet" href="https://unpkg.com/react-quill@2.0.0/dist/quill.snow.css" />
       </Head>

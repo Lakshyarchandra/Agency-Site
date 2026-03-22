@@ -1,44 +1,51 @@
-// pages/admin/dashboard.js
-import AdminLayout from '../../components/layout/AdminLayout';
+// pages/admin/dashboard.js — Client-side data fetching
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { getAdminFromRequest } from '../../lib/auth';
-import { getDB } from '../../lib/db';
+import AdminLayout from '../../components/layout/AdminLayout';
+import { isLoggedIn, getAdminInfo } from '../../lib/auth';
+import { apiGet } from '../../lib/api';
 import s from '../../styles/admin-dashboard.module.css';
 
-export async function getServerSideProps({ req }) {
-  const admin = getAdminFromRequest(req);
-  if (!admin) return { redirect: { destination: '/admin', permanent: false } };
+export default function Dashboard() {
+  const router = useRouter();
+  const [admin, setAdmin] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [recentPosts, setRecentPosts] = useState([]);
+  const [recentMessages, setRecentMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const db = getDB();
-  const [[{ totalPosts }]]     = await db.execute("SELECT COUNT(*) AS totalPosts FROM posts");
-  const [[{ published }]]      = await db.execute("SELECT COUNT(*) AS published FROM posts WHERE status='published'");
-  const [[{ drafts }]]         = await db.execute("SELECT COUNT(*) AS drafts FROM posts WHERE status='draft'");
-  const [[{ totalMessages }]]  = await db.execute("SELECT COUNT(*) AS totalMessages FROM contacts");
-  const [[{ unread }]]         = await db.execute("SELECT COUNT(*) AS unread FROM contacts WHERE is_read=0");
+  useEffect(() => {
+    if (!isLoggedIn()) { router.replace('/admin'); return; }
+    const adminInfo = getAdminInfo();
+    setAdmin(adminInfo);
 
-  const [recentPosts] = await db.execute(
-    `SELECT id, title, slug, status, published_at, created_at FROM posts ORDER BY created_at DESC LIMIT 5`
-  );
-  const [recentMessages] = await db.execute(
-    `SELECT id, name, email, service, is_read, created_at FROM contacts ORDER BY created_at DESC LIMIT 5`
-  );
+    apiGet('/api/dashboard/stats')
+      .then(data => {
+        if (!data) return; // 401 handled by apiGet
+        setStats(data.stats);
+        setRecentPosts(data.recentPosts);
+        setRecentMessages(data.recentMessages);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
-  return {
-    props: {
-      admin: JSON.parse(JSON.stringify(admin)),
-      stats: { totalPosts, published, drafts, totalMessages, unread },
-      recentPosts: JSON.parse(JSON.stringify(recentPosts)),
-      recentMessages: JSON.parse(JSON.stringify(recentMessages)),
-    },
-  };
-}
+  if (loading || !admin) {
+    return (
+      <AdminLayout title="Dashboard" admin={admin || {}}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
+          <span className="spinner" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
-export default function Dashboard({ admin, stats, recentPosts, recentMessages }) {
   const STAT_CARDS = [
-    { label: 'Total Posts',     val: stats.totalPosts,    icon: '📝', color: '#FF6B00', href: '/admin/posts' },
-    { label: 'Published',       val: stats.published,     icon: '✅', color: '#22cc88', href: '/admin/posts' },
-    { label: 'Drafts',          val: stats.drafts,        icon: '📋', color: '#FFB347', href: '/admin/posts' },
-    { label: 'Unread Messages', val: stats.unread,        icon: '💬', color: '#FF6B00', href: '/admin/messages' },
+    { label: 'Total Posts',     val: stats?.totalPosts || 0,    icon: '📝', color: '#FF6B00', href: '/admin/posts' },
+    { label: 'Published',       val: stats?.published || 0,     icon: '✅', color: '#22cc88', href: '/admin/posts' },
+    { label: 'Drafts',          val: stats?.drafts || 0,        icon: '📋', color: '#FFB347', href: '/admin/posts' },
+    { label: 'Unread Messages', val: stats?.unread || 0,        icon: '💬', color: '#FF6B00', href: '/admin/messages' },
   ];
 
   return (

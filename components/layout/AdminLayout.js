@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import toast from 'react-hot-toast';
 import Head from 'next/head';
+import { clearToken } from '../../lib/auth';
 import s from '../../styles/admin-layout.module.css';
 
 const NAV = [
@@ -41,8 +42,8 @@ export default function AdminLayout({ children, title = 'Admin Panel', admin }) 
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
 
-  const logout = async () => {
-    await fetch('/api/auth/admin-logout', { method: 'POST' });
+  const logout = () => {
+    clearToken();
     toast.success('Logged out');
     router.push('/admin');
   };

@@ -4,26 +4,24 @@ import Link from 'next/link';
 import Navbar from '../../components/layout/Navbar';
 import Footer from '../../components/layout/Footer';
 import SEOHead from '../../components/layout/SEOHead';
-import { getDB } from '../../lib/db';
 import { useScrollReveal } from '../../lib/useGSAP';
+import { uploadUrl } from '../../lib/api';
 import s from '../../styles/blogs.module.css';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export async function getStaticProps() {
   try {
-    const db = getDB();
-    const [posts] = await db.execute(
-      `SELECT p.id, p.title, p.slug, p.excerpt, p.feature_image,
-              p.published_at, c.name AS category
-       FROM posts p
-       LEFT JOIN categories c ON c.id = p.category_id
-       WHERE p.status = 'published'
-       ORDER BY p.published_at DESC`
-    );
-    const [cats] = await db.execute('SELECT * FROM categories ORDER BY name');
+    const [postsRes, catsRes] = await Promise.all([
+      fetch(`${API_URL}/api/blogs/published`),
+      fetch(`${API_URL}/api/categories`),
+    ]);
+    const { posts } = await postsRes.json();
+    const { categories } = await catsRes.json();
     return {
       props: {
         posts: JSON.parse(JSON.stringify(posts)),
-        categories: JSON.parse(JSON.stringify(cats)),
+        categories: JSON.parse(JSON.stringify(categories)),
       },
       revalidate: 60,
     };
@@ -107,7 +105,7 @@ export default function BlogsPage({ posts, categories }) {
                 {featured && (
                   <Link href={`/blogs/${featured.slug}`} className={s.featuredCard} ref={revealRef}>
                     <div className={s.featuredImage}
-                      style={{ backgroundImage: featured.feature_image ? `url(${featured.feature_image})` : 'none' }}>
+                      style={{ backgroundImage: featured.feature_image ? `url(${uploadUrl(featured.feature_image)})` : 'none' }}>
                       {!featured.feature_image && <span className={s.featuredPlaceholder}>✍️</span>}
                       {featured.category && <span className={s.featuredCategory}>{featured.category}</span>}
                     </div>
@@ -129,7 +127,7 @@ export default function BlogsPage({ posts, categories }) {
                     {rest.map(post => (
                       <Link key={post.id} href={`/blogs/${post.slug}`} className={s.postCard}>
                         <div className={s.postImage}
-                          style={{ backgroundImage: post.feature_image ? `url(${post.feature_image})` : 'none' }}>
+                          style={{ backgroundImage: post.feature_image ? `url(${uploadUrl(post.feature_image)})` : 'none' }}>
                           {!post.feature_image && <span className={s.postPlaceholder}>✍️</span>}
                           {post.category && <span className={s.postCategory}>{post.category}</span>}
                         </div>

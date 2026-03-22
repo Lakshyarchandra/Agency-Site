@@ -95,7 +95,7 @@
   flex-shrink: 0;
   border: 3px solid var(--saffron);
   background: var(--bg);
-  margin-top: 4px;
+  margin-top: 3.5rem;
   z-index: 1;
 }
 

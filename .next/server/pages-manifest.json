@@ -2,7 +2,13 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/about": "pages/about.js",
-  "/": "pages/index.js",
-  "/blogs": "pages/blogs.js"
+  "/blogs": "pages/blogs.js",
+  "/admin/posts/[id]": "pages/admin/posts/[id].js",
+  "/blogs/[slug]": "pages/blogs/[slug].js",
+  "/admin/posts/new": "pages/admin/posts/new.js",
+  "/admin/dashboard": "pages/admin/dashboard.js",
+  "/admin/posts": "pages/admin/posts.js",
+  "/admin/messages": "pages/admin/messages.js",
+  "/contact": "pages/contact.js",
+  "/admin/categories": "pages/admin/categories.js"
 }

@@ -3,15 +3,17 @@ const nextConfig = {
   reactStrictMode: true,
   images: {
     domains: ['localhost', 'ui-avatars.com'],
-  },
-  // Allow uploads folder to be served
-  async headers() {
-    return [
+    remotePatterns: [
       {
-        source: '/uploads/:path*',
-        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+        protocol: 'https',
+        hostname: '**',
       },
-    ];
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '5000',
+      },
+    ],
   },
 };
 

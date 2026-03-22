@@ -2,19 +2,18 @@ import Link from 'next/link';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 import SEOHead from '../components/layout/SEOHead';
-import { getDB } from '../lib/db';
+import { uploadUrl } from '../lib/api';
 import { useScrollReveal, useHeroAnimation, useCounterAnimation } from '../lib/useGSAP';
 import s from '../styles/home.module.css';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
 export async function getStaticProps() {
   try {
-    const db = getDB();
-    const [posts] = await db.execute(
-      `SELECT id, title, slug, excerpt, feature_image, published_at
-       FROM posts WHERE status='published'
-       ORDER BY published_at DESC LIMIT 3`
-    );
-    return { props: { latestPosts: JSON.parse(JSON.stringify(posts)) }, revalidate: 60 };
+    const res = await fetch(`${API_URL}/api/blogs/published`);
+    const { posts } = await res.json();
+    const latestPosts = posts.slice(0, 3);
+    return { props: { latestPosts: JSON.parse(JSON.stringify(latestPosts)) }, revalidate: 60 };
   } catch {
     return { props: { latestPosts: [] }, revalidate: 60 };
   }
@@ -190,7 +189,7 @@ export default function Home({ latestPosts }) {
               <div className={s.blogsGrid} ref={revealRef} data-stagger-children={`.${s.blogCard}`} data-stagger="0.1">
                 {latestPosts.map((post) => (
                   <Link key={post.id} href={`/blogs/${post.slug}`} className={s.blogCard}>
-                    <div className={s.blogImage} style={{ backgroundImage: post.feature_image ? `url(${post.feature_image})` : 'none' }}>
+                    <div className={s.blogImage} style={{ backgroundImage: post.feature_image ? `url(${uploadUrl(post.feature_image)})` : 'none' }}>
                       {!post.feature_image && <span>✍️</span>}
                     </div>
                     <div className={s.blogBody}>

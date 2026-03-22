@@ -1,39 +1,35 @@
-// pages/admin/posts/index.js
-import { useState } from 'react';
+// pages/admin/posts/index.js — Client-side data fetching
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import AdminLayout from '../../../components/layout/AdminLayout';
-import { getAdminFromRequest } from '../../../lib/auth';
-import { getDB } from '../../../lib/db';
+import { isLoggedIn, getAdminInfo } from '../../../lib/auth';
+import { apiGet, apiDelete } from '../../../lib/api';
 import toast from 'react-hot-toast';
 import s from '../../../styles/admin-posts.module.css';
 
-export async function getServerSideProps({ req }) {
-  const admin = getAdminFromRequest(req);
-  if (!admin) return { redirect: { destination: '/admin', permanent: false } };
-
-  const db = getDB();
-  const [posts] = await db.execute(
-    `SELECT p.id, p.title, p.slug, p.status, p.robots, p.published_at, p.created_at,
-            c.name AS category
-     FROM posts p
-     LEFT JOIN categories c ON c.id = p.category_id
-     ORDER BY p.created_at DESC`
-  );
-
-  return {
-    props: {
-      admin: JSON.parse(JSON.stringify(admin)),
-      posts: JSON.parse(JSON.stringify(posts)),
-    },
-  };
-}
-
-export default function PostsList({ admin, posts }) {
+export default function PostsList() {
   const router = useRouter();
+  const [admin, setAdmin] = useState(null);
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [deleting, setDeleting] = useState(null);
+
+  useEffect(() => {
+    if (!isLoggedIn()) { router.replace('/admin'); return; }
+    setAdmin(getAdminInfo());
+    loadPosts();
+  }, []);
+
+  const loadPosts = async () => {
+    try {
+      const data = await apiGet('/api/blogs');
+      if (data) setPosts(data.posts);
+    } catch {}
+    finally { setLoading(false); }
+  };
 
   const filtered = posts.filter(p => {
     const matchSearch = !search || p.title.toLowerCase().includes(search.toLowerCase());
@@ -45,15 +41,25 @@ export default function PostsList({ admin, posts }) {
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
     setDeleting(id);
     try {
-      const res = await fetch(`/api/blogs/${id}`, { method: 'DELETE' });
-      if (res.ok) { toast.success('Post deleted'); router.replace(router.asPath); }
-      else toast.error('Failed to delete');
-    } catch { toast.error('Network error'); }
+      await apiDelete(`/api/blogs/${id}`);
+      toast.success('Post deleted');
+      setPosts(prev => prev.filter(p => p.id !== id));
+    } catch { toast.error('Failed to delete'); }
     finally { setDeleting(null); }
   };
 
+  if (loading) {
+    return (
+      <AdminLayout title="Blog Posts" admin={admin || {}}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
+          <span className="spinner" />
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
-    <AdminLayout title="Blog Posts" admin={admin}>
+    <AdminLayout title="Blog Posts" admin={admin || {}}>
       {/* Toolbar */}
       <div className={s.toolbar}>
         <div className={s.toolbarLeft}>

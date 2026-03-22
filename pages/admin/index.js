@@ -1,34 +1,38 @@
-// pages/admin/index.js  — Admin Login
-import { useState } from 'react';
+// pages/admin/index.js  — Admin Login (client-side only)
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import toast from 'react-hot-toast';
-import { getAdminFromRequest } from '../../lib/auth';
+import { isLoggedIn, setToken, setAdminInfo } from '../../lib/auth';
+import { API_URL } from '../../lib/api';
 import s from '../../styles/admin-login.module.css';
-
-export async function getServerSideProps({ req }) {
-  const admin = getAdminFromRequest(req);
-  if (admin) return { redirect: { destination: '/admin/dashboard', permanent: false } };
-  return { props: {} };
-}
 
 export default function AdminLogin() {
   const router = useRouter();
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
+
+  // If already logged in, redirect to dashboard
+  useEffect(() => {
+    if (isLoggedIn()) router.replace('/admin/dashboard');
+  }, []);
+
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/admin-login', {
+      const res = await fetch(`${API_URL}/api/auth/admin-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error); return; }
+      // Store token & admin info
+      setToken(data.token);
+      setAdminInfo(data.admin);
       toast.success(`Welcome, ${data.admin.name}!`);
       router.push('/admin/dashboard');
     } catch { toast.error('Network error.'); }
