@@ -44,7 +44,6 @@ export default function AdminLogin() {
         </div>
         <div className="login-card">
           <div className="lc-logo">
-            <div className="logo-mark">IB</div>
             <div>
               <div className="logo-name">CodePromix</div>
               <div className="logo-sub">Admin Panel</div>
@@ -66,7 +65,6 @@ export default function AdminLogin() {
               {loading ? <><span className="spinner" /> Signing in…</> : <>Sign In →</>}
             </button>
           </form>
-          <p className="lc-hint">Default: admin@CodePromix.in / Admin@1234</p>
         </div>
       </div>
 
