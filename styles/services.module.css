@@ -1,0 +1,273 @@
+/* styles/services.module.css */
+
+/* ── Hero ─────────────────────────────────────────────── */
+.hero {
+  padding: calc(var(--header-h) + 4rem) 0 4rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.heroBg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.heroBg::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  right: -200px;
+  width: 700px;
+  height: 700px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,107,0,0.09) 0%, transparent 65%);
+  filter: blur(100px);
+}
+
+.heroTitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 700;
+  line-height: 1.15;
+  margin-bottom: 1rem;
+}
+
+.heroTitle em {
+  font-style: italic;
+  background: linear-gradient(135deg, var(--saffron), var(--gold));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.heroSub {
+  font-size: 1.05rem;
+  color: var(--text-2);
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+/* ── Tab Navigation ───────────────────────────────────── */
+.tabNav {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 3rem;
+  justify-content: center;
+}
+
+.tabButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.3rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.tabButton:hover {
+  border-color: var(--border-2);
+  color: var(--text-1);
+}
+
+.tabButtonActive {
+  background: linear-gradient(135deg, var(--saffron), var(--saffron-dk));
+  border-color: var(--saffron);
+  color: white;
+  box-shadow: 0 4px 16px rgba(255,107,0,0.3);
+}
+
+/* ── Service Detail Card ──────────────────────────────── */
+.detailCard {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  animation: cardFadeIn 0.4s ease both;
+}
+
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.detailHeader {
+  padding: 2.5rem 3rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.detailHeaderLeft { flex: 1; }
+
+.detailMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.detailIcon { font-size: 2rem; }
+
+.detailLabel {
+  display: inline-block;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--saffron);
+  background: rgba(255,107,0,0.08);
+  border: 1px solid var(--border-2);
+  padding: 3px 12px;
+  border-radius: 100px;
+}
+
+.detailTitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  font-weight: 700;
+  color: var(--text-1);
+  margin-bottom: 0.75rem;
+}
+
+.detailDesc { font-size: 1rem; line-height: 1.7; color: var(--text-2); max-width: 560px; }
+
+.detailPriceTag {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.priceBadge {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 0.4rem;
+}
+
+.priceValue {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--saffron);
+}
+
+/* ── Features/Deliverables ────────────────────────────── */
+.detailBody { padding: 2.5rem 3rem; }
+
+.detailSectionTitle {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 1rem;
+}
+
+.featuresGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.featureItem {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.88rem;
+  color: var(--text-1);
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.featureCheck { color: var(--saffron); font-weight: 600; }
+
+/* ── Tech Stack ───────────────────────────────────────── */
+.techRow {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.techPill {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  background: rgba(255,107,0,0.08);
+  border: 1px solid var(--border-2);
+  border-radius: 100px;
+  color: var(--saffron);
+}
+
+/* ── CTA ──────────────────────────────────────────────── */
+.detailCta {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Stats/Trust ──────────────────────────────────────── */
+.trustBar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  margin-top: 4rem;
+}
+
+.trustCard {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  text-align: center;
+  transition: border-color var(--transition), transform var(--transition);
+}
+
+.trustCard:hover {
+  border-color: var(--border-2);
+  transform: translateY(-2px);
+}
+
+.trustIcon { font-size: 1.5rem; margin-bottom: 0.4rem; }
+
+.trustValue {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--saffron);
+}
+
+.trustLabel { font-size: 0.82rem; color: var(--text-3); }
+
+/* ── Responsive ───────────────────────────────────────── */
+@media (max-width: 900px) {
+  .detailHeader { flex-direction: column; padding: 2rem 1.5rem; }
+  .detailBody   { padding: 2rem 1.5rem; }
+  .detailPriceTag { text-align: left; }
+  .trustBar { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .trustBar { grid-template-columns: 1fr 1fr; }
+  .featuresGrid { grid-template-columns: 1fr; }
+}

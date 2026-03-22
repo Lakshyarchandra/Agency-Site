@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{}"
+self.__REACT_LOADABLE_MANIFEST="{\"lib\\\\useGSAP.js -> gsap\":{\"id\":\"lib\\\\useGSAP.js -> gsap\",\"files\":[\"static/chunks/node_modules_gsap_index_js.js\"]},\"lib\\\\useGSAP.js -> gsap/dist/ScrollTrigger\":{\"id\":\"lib\\\\useGSAP.js -> gsap/dist/ScrollTrigger\",\"files\":[\"static/chunks/node_modules_gsap_dist_ScrollTrigger_js.js\"]}}"

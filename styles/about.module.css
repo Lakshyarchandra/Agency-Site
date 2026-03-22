@@ -1,0 +1,235 @@
+/* styles/about.module.css */
+
+/* ── Hero ─────────────────────────────────────────────── */
+.hero {
+  padding: calc(var(--header-h) + 4rem) 0 5rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.heroBg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.heroBg::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  right: -200px;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,107,0,0.08) 0%, transparent 65%);
+  filter: blur(80px);
+}
+
+.hero .heroTitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 700;
+  line-height: 1.15;
+  margin-bottom: 1.5rem;
+}
+
+.hero .heroSub {
+  font-size: 1.05rem;
+  line-height: 1.75;
+  color: var(--text-2);
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* ── Values ───────────────────────────────────────────── */
+.valuesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.valueCard {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+  transition: border-color var(--transition), transform var(--transition);
+}
+
+.valueCard:hover {
+  border-color: var(--border-2);
+  transform: translateY(-3px);
+}
+
+.valueIcon { font-size: 1.75rem; margin-bottom: 0.75rem; }
+
+.valueTitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-1);
+  margin-bottom: 0.5rem;
+}
+
+.valueDesc { font-size: 0.9rem; line-height: 1.7; color: var(--text-2); }
+
+/* ── Timeline ─────────────────────────────────────────── */
+.timeline { max-width: 700px; margin: 0 auto; position: relative; }
+
+.timelineLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 20px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--saffron) 0%, var(--border) 100%);
+}
+
+.timelineItem { display: flex; gap: 1.5rem; padding: 1.5rem 0; position: relative; }
+
+.timelineDot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 3px solid var(--saffron);
+  background: var(--bg);
+  margin-top: 4px;
+  z-index: 1;
+}
+
+.timelineCard {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  flex: 1;
+}
+
+.timelineYear {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--saffron);
+  letter-spacing: 0.15em;
+  margin-bottom: 0.4rem;
+}
+
+.timelineTitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-1);
+  margin-bottom: 0.4rem;
+}
+
+.timelineDesc { font-size: 0.88rem; line-height: 1.65; color: var(--text-2); }
+
+/* ── Team ─────────────────────────────────────────────── */
+.teamGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.5rem;
+}
+
+.teamCard {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+  text-align: center;
+  transition: border-color var(--transition), transform var(--transition);
+}
+
+.teamCard:hover { border-color: var(--border-2); transform: translateY(-3px); }
+
+.teamAvatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--saffron), var(--saffron-dk));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  margin: 0 auto 1rem;
+}
+
+.teamName {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-1);
+  margin-bottom: 0.3rem;
+}
+
+.teamRole {
+  font-size: 0.82rem;
+  color: var(--saffron);
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+}
+
+.teamDesc { font-size: 0.85rem; line-height: 1.6; color: var(--text-2); }
+
+/* ── CTA ──────────────────────────────────────────────── */
+.ctaBanner {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  text-align: center;
+  padding: 4rem 2rem;
+  margin-top: 4rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.ctaBanner::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,107,0,0.06) 0%, transparent 70%);
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+.ctaBanner .section-label { position: relative; z-index: 1; }
+
+.ctaTitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  color: var(--text-1);
+  position: relative;
+  z-index: 1;
+  margin: 1rem 0 0.75rem;
+}
+
+.ctaTitle em {
+  font-style: italic;
+  background: linear-gradient(135deg, var(--saffron), var(--gold));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ctaSub {
+  font-size: 0.95rem;
+  color: var(--text-2);
+  position: relative;
+  z-index: 1;
+  margin-bottom: 2rem;
+}
+
+/* ── Responsive ───────────────────────────────────────── */
+@media (max-width: 640px) {
+  .valuesGrid { grid-template-columns: 1fr; }
+  .teamGrid   { grid-template-columns: 1fr; }
+}
